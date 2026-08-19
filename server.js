@@ -22,12 +22,12 @@ function serveStatic(req, res) {
   res.writeHead(200, {'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream'});
   fs.createReadStream(filePath).pipe(res);
 }
-function streamDriveVideo(req, res, id) {
+function streamDriveVideo(req, res, id, resourceKey) {
   if (!DRIVE_API_KEY) return send(res, 500, 'GOOGLE_DRIVE_API_KEY is not configured on the server.');
   if (!/^[-_a-zA-Z0-9]{10,}$/.test(id)) return send(res, 400, 'Invalid Google Drive file ID.');
   const options = {
     hostname: 'www.googleapis.com',
-    path: `/drive/v3/files/${encodeURIComponent(id)}?alt=media&key=${encodeURIComponent(DRIVE_API_KEY)}`,
+    path: `/drive/v3/files/${encodeURIComponent(id)}?alt=media&key=${encodeURIComponent(DRIVE_API_KEY)}${resourceKey ? `&resourceKey=${encodeURIComponent(resourceKey)}` : ''}`,
     headers: req.headers.range ? {Range:req.headers.range} : {}
   };
   https.get(options, driveRes => {
@@ -43,7 +43,8 @@ function streamDriveVideo(req, res, id) {
   }).on('error', () => send(res, 502, 'Unable to stream this Google Drive video.'));
 }
 http.createServer((req, res) => {
-  const match = req.url.match(/^\/api\/video\/([-_a-zA-Z0-9]+)$/);
-  if (match) return streamDriveVideo(req, res, match[1]);
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const match = url.pathname.match(/^\/api\/video\/([-_a-zA-Z0-9]+)$/);
+  if (match) return streamDriveVideo(req, res, match[1], url.searchParams.get('resourceKey'));
   serveStatic(req, res);
 }).listen(PORT, () => console.log(`Salon site running on port ${PORT}`));
