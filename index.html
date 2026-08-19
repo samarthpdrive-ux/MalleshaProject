@@ -515,17 +515,7 @@
 
     <dialog id="videoModal" class="video-modal">
         <button id="closeVideoModal" class="video-close" aria-label="Close video">&times;</button>
-        <div class="custom-video-player">
-            <video id="videoPlayer" playsinline preload="metadata" title="Salon video"></video>
-            <div class="custom-video-controls">
-                <button id="videoPlayPause" aria-label="Play video">▶</button>
-                <input id="videoProgress" type="range" min="0" max="100" value="0" aria-label="Video progress">
-                <span id="videoTime">0:00 / 0:00</span>
-                <button id="videoMute" aria-label="Mute video">🔊</button>
-                <input id="videoVolume" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume">
-                <button id="videoFullscreen" aria-label="Fullscreen video">⛶</button>
-            </div>
-        </div>
+        <iframe id="videoPlayer" title="Salon video" allow="autoplay; fullscreen" allowfullscreen></iframe>
         <div class="video-modal-content">
             <p id="modalVideoCategory"></p>
             <h3 id="modalVideoTitle"></h3>
