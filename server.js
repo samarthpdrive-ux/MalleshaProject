@@ -31,6 +31,16 @@ function streamDriveVideo(req, res, id, resourceKey) {
     headers: req.headers.range ? {Range:req.headers.range} : {}
   };
   https.get(options, driveRes => {
+    if (driveRes.statusCode >= 400) {
+      const chunks = [];
+      driveRes.on('data', chunk => chunks.push(chunk));
+      driveRes.on('end', () => {
+        const detail = Buffer.concat(chunks).toString('utf8');
+        console.error(`Google Drive stream failed for ${id}: HTTP ${driveRes.statusCode} ${detail}`);
+        send(res, driveRes.statusCode, 'Google Drive rejected the stream request. Check Render logs for the detailed reason.');
+      });
+      return;
+    }
     if (driveRes.statusCode >= 300 && driveRes.statusCode < 400 && driveRes.headers.location) {
       driveRes.resume();
       return https.get(driveRes.headers.location, redirected => {
