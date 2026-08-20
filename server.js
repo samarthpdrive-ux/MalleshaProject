@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express=require('express'), multer=require('multer'), cloudinary=require('cloudinary').v2, mysql=require('mysql2/promise'), crypto=require('node:crypto'), fs=require('node:fs'), path=require('node:path');
 const app=express(), PORT=process.env.PORT||3000, ADMIN_PASSWORD=process.env.ADMIN_PASSWORD, DB_NAME=process.env.TIDB_DATABASE||'salon_admin';
 const MASTER_KEY=crypto.createHash('sha256').update(process.env.MASTER_KEY||'').digest(), sessions=new Set(); let pool;
