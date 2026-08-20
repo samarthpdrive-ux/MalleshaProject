@@ -1,36 +1,21 @@
-const express = require('express');
-const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-const crypto = require('node:crypto');
-const fs = require('node:fs');
-const path = require('node:path');
-const app = express();
-const PORT = process.env.PORT || 3000;
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
-const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
-const VIDEOS_FILE = path.join(DATA_DIR, 'videos.json');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const MASTER_KEY = crypto.createHash('sha256').update(process.env.MASTER_KEY || '').digest();
-const sessions = new Set();
-fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(ACCOUNTS_FILE)) fs.writeFileSync(ACCOUNTS_FILE, '[]');
-if (!fs.existsSync(VIDEOS_FILE)) fs.writeFileSync(VIDEOS_FILE, '[]');
-if (!ADMIN_PASSWORD || !process.env.MASTER_KEY) console.warn('Set ADMIN_PASSWORD and MASTER_KEY in Render before using the admin panel.');
-app.use(express.json()); app.use(express.static(__dirname));
-const upload = multer({ dest:path.join(DATA_DIR, 'uploads'), limits:{fileSize:100 * 1024 * 1024} });
-const read = file => JSON.parse(fs.readFileSync(file, 'utf8'));
-const write = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
-function encrypt(value) { const iv=crypto.randomBytes(12), cipher=crypto.createCipheriv('aes-256-gcm', MASTER_KEY, iv), encrypted=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]); return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${encrypted.toString('base64')}`; }
-function decrypt(value) { const [iv,tag,text]=value.split('.').map(x=>Buffer.from(x,'base64')), decipher=crypto.createDecipheriv('aes-256-gcm',MASTER_KEY,iv); decipher.setAuthTag(tag); return Buffer.concat([decipher.update(text),decipher.final()]).toString('utf8'); }
-function token(req) { return (req.headers.cookie || '').split(';').map(x=>x.trim()).find(x=>x.startsWith('salon_admin='))?.slice(12); }
-function admin(req,res,next) { return sessions.has(token(req)) ? next() : res.status(401).json({error:'Please sign in.'}); }
-function safeAccounts() { return read(ACCOUNTS_FILE).map(({encrypted,...account})=>account); }
-app.get('/api/videos', (req,res)=>res.json(read(VIDEOS_FILE)));
-app.post('/api/admin/login', (req,res) => { if (!ADMIN_PASSWORD || !req.body.password || req.body.password !== ADMIN_PASSWORD) return res.status(401).json({error:'Invalid password.'}); const id=crypto.randomBytes(32).toString('hex'); sessions.add(id); res.setHeader('Set-Cookie',`salon_admin=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`); res.json({success:true}); });
-app.post('/api/admin/logout', admin, (req,res)=>{ sessions.delete(token(req)); res.setHeader('Set-Cookie','salon_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); res.json({success:true}); });
-app.get('/api/admin/accounts', admin, (req,res)=>res.json(safeAccounts()));
-app.post('/api/admin/accounts', admin, (req,res)=>{ const {name,cloudName,apiKey,apiSecret}=req.body; if (![name,cloudName,apiKey,apiSecret].every(Boolean)) return res.status(400).json({error:'Complete every account field.'}); const accounts=read(ACCOUNTS_FILE); accounts.push({id:crypto.randomUUID(),name,cloudName,encrypted:encrypt(JSON.stringify({apiKey,apiSecret}))}); write(ACCOUNTS_FILE,accounts); res.status(201).json({success:true}); });
-app.delete('/api/admin/accounts/:id', admin, (req,res)=>{ write(ACCOUNTS_FILE,read(ACCOUNTS_FILE).filter(a=>a.id!==req.params.id)); res.json({success:true}); });
-app.post('/api/admin/upload', admin, upload.single('video'), async (req,res)=>{ try { if (!req.file) return res.status(400).json({error:'Choose an MP4 video.'}); const account=read(ACCOUNTS_FILE).find(a=>a.id===req.body.accountId); if (!account) return res.status(400).json({error:'Choose a Cloudinary account.'}); const {apiKey,apiSecret}=JSON.parse(decrypt(account.encrypted)); cloudinary.config({cloud_name:account.cloudName,api_key:apiKey,api_secret:apiSecret,secure:true}); const result=await cloudinary.uploader.upload(req.file.path,{resource_type:'video',folder:'salon-videos'}); const videos=read(VIDEOS_FILE); videos.unshift({id:result.public_id,title:req.body.title||req.file.originalname,category:req.body.category||'Salon video',artist:req.body.artist||'Mallesha Hair Studio',description:req.body.description||'',videoUrl:result.secure_url,poster:result.secure_url.replace('/upload/','/upload/so_0/').replace(/\.[^.]+$/,'.jpg')}); write(VIDEOS_FILE,videos); fs.unlink(req.file.path,()=>{}); res.status(201).json({success:true}); } catch(error) { if(req.file) fs.unlink(req.file.path,()=>{}); console.error(error); res.status(500).json({error:'Upload failed. Check Cloudinary credentials and file size.'}); } });
-app.delete('/api/admin/videos/:id', admin, (req,res)=>{ write(VIDEOS_FILE,read(VIDEOS_FILE).filter(v=>v.id!==req.params.id)); res.json({success:true}); });
-app.listen(PORT,()=>console.log(`Salon admin running on port ${PORT}`));
+require('dotenv').config();
+const express=require('express'), multer=require('multer'), cloudinary=require('cloudinary').v2, mysql=require('mysql2/promise'), crypto=require('node:crypto'), fs=require('node:fs'), path=require('node:path');
+const app=express(), PORT=process.env.PORT||3000, ADMIN_PASSWORD=process.env.ADMIN_PASSWORD, DB_NAME=process.env.TIDB_DATABASE||'salon_admin';
+const MASTER_KEY=crypto.createHash('sha256').update(process.env.MASTER_KEY||'').digest(), sessions=new Set(); let pool;
+const upload=multer({dest:path.join('/tmp','salon-uploads'),limits:{fileSize:100*1024*1024}});
+const dbConfig={host:process.env.TIDB_HOST,port:Number(process.env.TIDB_PORT||4000),user:process.env.TIDB_USER,password:process.env.TIDB_PASSWORD,ssl:process.env.TIDB_SSL==='true'?{minVersion:'TLSv1.2',rejectUnauthorized:true}:undefined};
+function encrypt(value){const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',MASTER_KEY,iv),text=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${text.toString('base64')}`}
+function decrypt(value){const [iv,tag,text]=value.split('.').map(x=>Buffer.from(x,'base64')),decipher=crypto.createDecipheriv('aes-256-gcm',MASTER_KEY,iv);decipher.setAuthTag(tag);return Buffer.concat([decipher.update(text),decipher.final()]).toString('utf8')}
+function token(req){return(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('salon_admin='))?.slice(12)}
+function admin(req,res,next){return sessions.has(token(req))?next():res.status(401).json({error:'Please sign in.'})}
+async function initDb(){if(!/^[A-Za-z0-9_]+$/.test(DB_NAME))throw Error('TIDB_DATABASE must contain only letters, numbers, and underscores.');const root=await mysql.createConnection(dbConfig);await root.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\``);await root.end();pool=mysql.createPool({...dbConfig,database:DB_NAME,waitForConnections:true,connectionLimit:5});await pool.query(`CREATE TABLE IF NOT EXISTS cloudinary_accounts (id VARCHAR(36) PRIMARY KEY,name VARCHAR(120) NOT NULL,cloud_name VARCHAR(120) NOT NULL,encrypted LONGTEXT NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);await pool.query(`CREATE TABLE IF NOT EXISTS videos (id VARCHAR(255) PRIMARY KEY,title VARCHAR(255) NOT NULL,category VARCHAR(120),artist VARCHAR(120),description TEXT,video_url TEXT NOT NULL,poster TEXT,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)}
+app.use(express.json());app.use(express.static(__dirname));
+app.get('/api/videos',async(req,res)=>{const[rows]=await pool.query('SELECT id,title,category,artist,description,video_url AS videoUrl,poster FROM videos ORDER BY created_at DESC');res.json(rows)});
+app.post('/api/admin/login',(req,res)=>{if(!ADMIN_PASSWORD||!req.body.password||req.body.password!==ADMIN_PASSWORD)return res.status(401).json({error:'Invalid password.'});const id=crypto.randomBytes(32).toString('hex');sessions.add(id);res.setHeader('Set-Cookie',`salon_admin=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`);res.json({success:true})});
+app.post('/api/admin/logout',admin,(req,res)=>{sessions.delete(token(req));res.setHeader('Set-Cookie','salon_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');res.json({success:true})});
+app.get('/api/admin/accounts',admin,async(req,res)=>{const[rows]=await pool.query('SELECT id,name,cloud_name AS cloudName FROM cloudinary_accounts ORDER BY created_at DESC');res.json(rows)});
+app.post('/api/admin/accounts',admin,async(req,res)=>{const{name,cloudName,apiKey,apiSecret}=req.body;if(![name,cloudName,apiKey,apiSecret].every(Boolean))return res.status(400).json({error:'Complete every account field.'});await pool.execute('INSERT INTO cloudinary_accounts (id,name,cloud_name,encrypted) VALUES (?,?,?,?)',[crypto.randomUUID(),name,cloudName,encrypt(JSON.stringify({apiKey,apiSecret}))]);res.status(201).json({success:true})});
+app.delete('/api/admin/accounts/:id',admin,async(req,res)=>{await pool.execute('DELETE FROM cloudinary_accounts WHERE id=?',[req.params.id]);res.json({success:true})});
+app.post('/api/admin/upload',admin,upload.single('video'),async(req,res)=>{try{if(!req.file)return res.status(400).json({error:'Choose an MP4 video.'});const[accounts]=await pool.execute('SELECT * FROM cloudinary_accounts WHERE id=?',[req.body.accountId]);if(!accounts[0])return res.status(400).json({error:'Choose a Cloudinary account.'});const{apiKey,apiSecret}=JSON.parse(decrypt(accounts[0].encrypted));cloudinary.config({cloud_name:accounts[0].cloud_name,api_key:apiKey,api_secret:apiSecret,secure:true});const result=await cloudinary.uploader.upload(req.file.path,{resource_type:'video',folder:'salon-videos'}),poster=result.secure_url.replace('/upload/','/upload/so_0/').replace(/\.[^.]+$/,'.jpg');await pool.execute('INSERT INTO videos (id,title,category,artist,description,video_url,poster) VALUES (?,?,?,?,?,?,?)',[result.public_id,req.body.title||req.file.originalname,req.body.category||'Salon video',req.body.artist||'Mallesha Hair Studio',req.body.description||'',result.secure_url,poster]);fs.unlink(req.file.path,()=>{});res.status(201).json({success:true})}catch(error){if(req.file)fs.unlink(req.file.path,()=>{});console.error(error);res.status(500).json({error:'Upload failed. Check Cloudinary details and TiDB connection.'})}});
+app.delete('/api/admin/videos/:id',admin,async(req,res)=>{await pool.execute('DELETE FROM videos WHERE id=?',[req.params.id]);res.json({success:true})});
+initDb().then(()=>app.listen(PORT,()=>console.log(`Salon admin with TiDB running on ${PORT}`))).catch(error=>{console.error('TiDB startup failed:',error);process.exit(1)});
