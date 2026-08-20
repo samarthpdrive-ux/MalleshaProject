@@ -828,3 +828,16 @@ footer p {
 .custom-video-player:fullscreen #videoPlayer,
 .custom-video-player:-webkit-full-screen #videoPlayer { width:100vw; height:100vh; object-fit:contain; background:transparent; }
 @media(min-width:701px){.video-modal .custom-video-player #videoBackdrop{display:block}.video-modal .custom-video-player #videoPlayer{width:100%;height:100%;object-fit:contain;background:transparent}}
+
+/* One maximized video dashboard: player and its details stay together. */
+@media(min-width:701px){
+  .video-modal { display:grid; grid-template-columns:minmax(0,1fr) 320px; grid-template-rows:1fr; height:92dvh; padding:0; background:#0d0c0c; }
+  .video-modal .custom-video-player { grid-column:1; height:92dvh; min-height:0; }
+  .video-modal .video-modal-content { position:static; grid-column:2; display:flex; flex-direction:column; justify-content:center; min-height:0; padding:48px 32px; background:linear-gradient(145deg,#211b18,#0d0d0e 66%); border-left:1px solid rgba(211,163,111,.25); }
+  .video-modal .video-modal-content > p:first-child { margin-bottom:14px; color:#d3a36f; }
+  .video-modal .video-modal-content h3 { margin:0 0 16px; color:#fff; font-size:38px; line-height:1.08; }
+  .video-modal .video-modal-content > p:last-of-type { display:block; margin:0 0 28px; color:#c9c2bd; font:14px/1.7 'Poppins',sans-serif; }
+  .video-modal .video-modal-content a { align-self:flex-start; background:transparent; border:1px solid rgba(211,163,111,.7); color:#fff; }
+  .video-modal .video-modal-content a:hover { background:#b58b61; color:#251a15; }
+  .video-modal .video-close { z-index:5; }
+}
