@@ -794,6 +794,6 @@ footer p {
 
 /* Portrait clips stay sharp in the middle; a blurred copy fills the desktop stage. */
 .video-modal .custom-video-player { isolation:isolate; overflow:hidden; }
-.video-modal .custom-video-player #videoBackdrop { position:absolute; inset:-8%; z-index:0; display:block; width:116%; height:116%; max-width:none; object-fit:cover; opacity:.78; background:transparent; filter:blur(34px) brightness(.48) saturate(1.18); transform:scale(1.08); pointer-events:none; }
+.video-modal .custom-video-player #videoBackdrop { position:absolute; inset:-3%; z-index:0; display:block; width:106%; height:106%; max-width:none; object-fit:cover; opacity:.52; background:transparent; filter:blur(24px) brightness(.40) saturate(1.08); transform:scale(1.03); pointer-events:none; }
 .video-modal .custom-video-player #videoPlayer { position:relative; z-index:1; background:transparent; object-fit:contain; }
 .video-modal .custom-video-controls { z-index:2; }
