@@ -841,3 +841,8 @@ footer p {
   .video-modal .video-modal-content a:hover { background:#b58b61; color:#251a15; }
   .video-modal .video-close { z-index:5; }
 }
+
+/* The complete dashboard, not only the video, fills the screen when opened. */
+.video-modal:fullscreen,
+.video-modal:-webkit-full-screen { top:0; right:0; width:100vw; height:100dvh; max-width:none; max-height:none; margin:0; border-radius:0; }
+@media(min-width:701px){.video-modal:fullscreen,.video-modal:-webkit-full-screen{grid-template-columns:minmax(0,1fr) 340px;height:100dvh}.video-modal:fullscreen .custom-video-player,.video-modal:-webkit-full-screen .custom-video-player{height:100dvh}}
