@@ -515,7 +515,17 @@
 
     <aside id="videoModal" class="video-modal" aria-hidden="true">
         <button id="closeVideoModal" class="video-close" aria-label="Close video">&times;</button>
-        <iframe id="videoPlayer" title="Salon video" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        <div class="custom-video-player">
+            <video id="videoPlayer" playsinline preload="metadata" title="Salon video"></video>
+            <div class="custom-video-controls">
+                <button id="videoBack10" aria-label="Back 10 seconds">↶ 10</button>
+                <button id="videoPlayPause" aria-label="Play video">▶</button>
+                <button id="videoForward10" aria-label="Forward 10 seconds">10 ↷</button>
+                <span id="videoTime">0:00 / 0:00</span>
+                <button id="videoMute" aria-label="Mute video">🔊</button>
+                <button id="videoFullscreen" aria-label="Fullscreen video">⛶</button>
+            </div>
+        </div>
         <div class="video-modal-content">
             <p id="modalVideoCategory"></p>
             <h3 id="modalVideoTitle"></h3>
