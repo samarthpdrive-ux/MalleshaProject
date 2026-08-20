@@ -746,9 +746,11 @@ footer p {
 .video-gallery-heading > div > p, .video-modal-content > p:first-child { color:#b58b61; letter-spacing:2px; font-size:12px; font-weight:600; margin:0 0 8px; }
 .video-gallery-heading h3 { margin:0; font-family:'Playfair Display',serif; font-size:34px; color:#33251f; }
 #videoSearch { width:280px; padding:12px 14px; border:1px solid #d9cbc1; border-radius:4px; font-family:'Poppins',sans-serif; outline-color:#b58b61; }
-.video-filters { display:flex; gap:9px; overflow-x:auto; padding:5px 0 15px; }
-.video-filter { padding:8px 15px; border:1px solid #d9cbc1; background:#fff; border-radius:22px; cursor:pointer; font-family:'Poppins',sans-serif; font-size:13px; white-space:nowrap; }
-.video-filter.active { background:#33251f; color:#fff; border-color:#33251f; }
+
+.video-filters {
+  display: none;
+}
+
 .video-status { color:#776963; font-size:14px; min-height:22px; }
 .video-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:22px; }
 .video-card { background:#fff; border:1px solid #e8ddd6; cursor:pointer; transition:transform .25s,box-shadow .25s; overflow:hidden; }
